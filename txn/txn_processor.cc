@@ -282,6 +282,7 @@ void TxnProcessor::RunOCCScheduler() {
   // Fetch transaction requests, and immediately begin executing them.
   while (tp_.Active()) {
     Txn *txn;
+
     if (txn_requests_.Pop(&txn)) {
 
       // Start txn running in its own thread.
@@ -319,20 +320,6 @@ void TxnProcessor::RunOCCScheduler() {
       txn_results_.Push(finished);
     }
   }
-}
-
-void TxnProcessor::RunOCCParallelScheduler() {
-  // CPSC 438/538:
-  //
-  // Implement this method! Note that implementing OCC with parallel
-  // validation may need to create another method, like
-  // TxnProcessor::ExecuteTxnParallel.
-  // Note that you can use active_set_ and active_set_mutex_ we provided
-  // for you in the txn_processor.h
-  //
-  // [For now, run serial scheduler in order to make it through the test
-  // suite]
-  RunSerialScheduler();
 }
 
 void TxnProcessor::RunMVCCScheduler() {
