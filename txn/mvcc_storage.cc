@@ -97,6 +97,7 @@ bool MVCCStorage::CheckWrite(Key key, int txn_unique_id) {
         MaxRTS = (*it)->max_read_id_;
       }
     }
+    // Result valid iff Ti > max (RTS and WTS)
     return MaxVersion <= txn_unique_id && MaxRTS <= txn_unique_id;
   }else{
     // Key empty
@@ -114,6 +115,16 @@ void MVCCStorage::Write(Key key, Value value, int txn_unique_id) {
   // into the version_lists. Note that InitStorage() also calls this method to init storage. 
   // Note that you don't have to call Lock(key) in this method, just
   // call Lock(key) before you call this method and call Unlock(key) afterward.
+  Version *nVersion = new Version();
+  nVersion->value_ = value;
+  nVersion->max_read_id_ = txn_unique_id;
+  nVersion->version_id_ = txn_unique_id;
+  
+  // Check if storage exist
+  if(!mvcc_data_.count(key)){
+    mvcc_data_[key] = new deque<Version*>();
+  }
+  mvcc_data_[key]->push_back(nVersion);
 }
 
 
