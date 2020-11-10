@@ -345,6 +345,74 @@ void TxnProcessor::RunMVCCScheduler() {
   //
   // [For now, run serial scheduler in order to make it through the test
   // suite]
-  RunSerialScheduler();
+  Txn *txn;
+  while(tp_.Active()){
+    // Check txn availability
+    if(txn_requests_.Pop(&txn)){
+      // Thread execute
+      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(this, &TxnProcessor::MVCCExecuteTxn, txn));
+    }
+  }
 }
 
+void TxnProcessor::MVCCExecuteTxn(Txn *txn){
+  // Based on pseudo code in README on reference
+  Value res;
+  bool ver = true;
+  // Read all necessary data for this transaction from storage (Note that you should lock the key before each read)
+  // Readset
+  for(set<Key>::iterator it = txn->readset_.begin(); it != txn->readset_.end(); it++){
+    storage_->Lock(*it);
+    if(storage_->Read(*it, &res, txn->unique_id_)){
+      txn->reads_[*it] = res;
+    }
+    storage_->Unlock(*it);
+  }
+  // Writeset
+  for(set<Key>::iterator it = txn->writeset_.begin(); it != txn->writeset_.end(); it++){
+    storage_->Lock(*it);
+    if(storage_->Read(*it, &res, txn->unique_id_)){
+      txn->reads_[*it] = res;
+    }
+    storage_->Unlock(*it);
+  }
+  // Execute the transaction logic (i.e. call Run() on the transaction)
+  txn->Run();
+  completed_txns_.Push(txn);
+  // Acquire all locks for keys in the write_set_
+  for(set<Key>::iterator it = txn->writeset_.begin(); it != txn->writeset_.end(); it++){
+    // Call MVCCStorage::CheckWrite method to check all keys in the write_set_
+    if(!storage_->CheckWrite(*it, txn->unique_id_)){
+      ver = false;
+      break;
+    }
+  }
+  // If (each key passed the check)
+  if(ver){
+    // Apply the writes
+    ApplyWrites(txn);
+    // Release all locks for keys in the write_set_
+    for(set<Key>::iterator it = txn->writeset_.begin(); it != txn->writeset_.end(); it++){
+      storage_->Unlock(*it);
+    }
+    // Commit transaction
+    txn->status_ = COMMITTED;
+    txn_results_.Push(txn);
+  //   else if (at least one key failed the check)
+  }else{
+    // Release all locks for keys in the write_set_
+    for(set<Key>::iterator it = txn->writeset_.begin(); it != txn->writeset_.end(); it++){
+      storage_->Unlock(*it);
+    }
+    // Cleanup txn
+    txn->reads_.empty();
+    txn->writes_.empty();
+    txn->status_ = INCOMPLETE;
+    // Completely restart the transaction.
+    mutex_.Lock();
+    txn->unique_id_ = next_unique_id_;
+    next_unique_id_++;
+    txn_requests_.Push(txn);
+    mutex_.Unlock(); 
+  }
+}

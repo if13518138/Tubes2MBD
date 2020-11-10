@@ -48,6 +48,8 @@ bool MVCCStorage::Read(Key key, Value* result, int txn_unique_id) {
   // Hint: Iterate the version_lists and return the verion whose write timestamp
   // (version_id) is the largest write timestamp less than or equal to txn_unique_id.
 
+  // Read always true except key is empty
+
   if(mvcc_data_.count(key)){
     int MaxVersion = -1;
     // Deque version list
@@ -59,7 +61,7 @@ bool MVCCStorage::Read(Key key, Value* result, int txn_unique_id) {
         MaxVersion = v_wts;
         *result = (*it)->value_;
         if(txn_unique_id > (*it)->max_read_id_){
-          (*it)->max_read_id_) = txn_unique_id;
+          (*it)->max_read_id_ = txn_unique_id;
         }
       }
     }
@@ -84,6 +86,8 @@ bool MVCCStorage::CheckWrite(Key key, int txn_unique_id) {
   // write_set. Return true if this key passes the check, return false if not. 
   // Note that you don't have to call Lock(key) in this method, just
   // call Lock(key) before you call this method and call Unlock(key) afterward.
+
+  // Write true iff transaction > largest rts and wts
   
   if(mvcc_data_.count(key)){
     // Deque version list
