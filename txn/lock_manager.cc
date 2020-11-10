@@ -91,93 +91,93 @@ LockMode LockManagerA::Status(const Key& key, vector<Txn*>* owners) {
   }
 }
 
-// LockManagerB::LockManagerB(deque<Txn*>* ready_txns) {
-//   ready_txns_ = ready_txns;
-// }
+LockManagerB::LockManagerB(deque<Txn*>* ready_txns) {
+  ready_txns_ = ready_txns;
+}
 
-// bool LockManagerB::_addLock(LockMode mode, Txn* txn, const Key& key) {
-//   LockRequest rq(mode, txn);
-//   LockMode status = Status(key, nullptr);
+bool LockManagerB::_addLock(LockMode mode, Txn* txn, const Key& key) {
+  LockRequest rq(mode, txn);
+  LockMode status = Status(key, nullptr);
 
-//   deque<LockRequest> *dq = _getLockQueue(key);
-//   dq->push_back(rq);
+  deque<LockRequest> *dq = _getLockQueue(key);
+  dq->push_back(rq);
 
-//   bool granted = status == UNLOCKED;
-//   if (mode == SHARED) {
-//     granted |= _noExclusiveWaiting(key);
-//   } else {
-//     _numExclusiveWaiting[key]++;
-//   }
+  bool granted = status == UNLOCKED;
+  if (mode == SHARED) {
+    granted |= _noExclusiveWaiting(key);
+  } else {
+    _numExclusiveWaiting[key]++;
+  }
 
-//   if (!granted)
-//     txn_waits_[txn]++;
+  if (!granted)
+    txn_waits_[txn]++;
 
-//   return granted;
-// }
+  return granted;
+}
 
 
-// bool LockManagerB::WriteLock(Txn* txn, const Key& key) {
-//   return _addLock(EXCLUSIVE, txn, key);
-// }
+bool LockManagerB::WriteLock(Txn* txn, const Key& key) {
+  return _addLock(EXCLUSIVE, txn, key);
+}
 
-// bool LockManagerB::ReadLock(Txn* txn, const Key& key) {
-//   return _addLock(SHARED, txn, key);
-// }
+bool LockManagerB::ReadLock(Txn* txn, const Key& key) {
+  return _addLock(SHARED, txn, key);
+}
 
-// void LockManagerB::Release(Txn* txn, const Key& key) {
-//   deque<LockRequest> *queue = _getLockQueue(key);
+void LockManagerB::Release(Txn* txn, const Key& key) {
+  deque<LockRequest> *queue = _getLockQueue(key);
 
-//   for (auto it = queue->begin(); it < queue->end(); it++) {
-//     if (it->txn_ == txn) {
-//       queue->erase(it);
-//       if (it->mode_ == EXCLUSIVE) {
-//         _numExclusiveWaiting[key]--;
-//       }
+  for (auto it = queue->begin(); it < queue->end(); it++) {
+    if (it->txn_ == txn) {
+      queue->erase(it);
+      if (it->mode_ == EXCLUSIVE) {
+        _numExclusiveWaiting[key]--;
+      }
 
-//       break;
-//     }
-//   }
+      break;
+    }
+  }
 
-//   // Advance the lock, by making new owners ready.
-//   // Some in newOwners already own the lock.  These are not in
-//   // txn_waits_.
-//   vector<Txn*> newOwners;
-//   Status(key, &newOwners);
+  // Advance the lock, by making new owners ready.
+  // Some in newOwners already own the lock.  These are not in
+  // txn_waits_.
+  vector<Txn*> newOwners;
+  Status(key, &newOwners);
 
-//   for (auto&& owner : newOwners) {
-//     auto waitCount = txn_waits_.find(owner);
-//     if (waitCount != txn_waits_.end() && --(waitCount->second) == 0) {
-//       ready_txns_->push_back(owner);
-//       txn_waits_.erase(waitCount);
-//     }
-//   }
-// }
+  for (auto&& owner : newOwners) {
+    auto waitCount = txn_waits_.find(owner);
+    if (waitCount != txn_waits_.end() && --(waitCount->second) == 0) {
+      ready_txns_->push_back(owner);
+      txn_waits_.erase(waitCount);
+    }
+  }
+}
 
-// LockMode LockManagerB::Status(const Key& key, vector<Txn*>* owners) {
-//   deque<LockRequest> *dq = _getLockQueue(key);
-//   if (dq->empty()) {
-//     return UNLOCKED;
-//   }
+LockMode LockManagerB::Status(const Key& key, vector<Txn*>* owners) {
+  deque<LockRequest> *dq = _getLockQueue(key);
+  if (dq->empty()) {
+    return UNLOCKED;
+  }
 
-//   LockMode mode = EXCLUSIVE;
-//   vector<Txn*> txn_owners;
-//   for (auto&& lockRequest : *dq) {
-//     if (lockRequest.mode_ == EXCLUSIVE && mode == SHARED)
-//         break;
+  LockMode mode = EXCLUSIVE;
+  vector<Txn*> txn_owners;
+  for (auto&& lockRequest : *dq) {
+    if (lockRequest.mode_ == EXCLUSIVE && mode == SHARED)
+        break;
 
-//     txn_owners.push_back(lockRequest.txn_);
-//     mode = lockRequest.mode_;
+    txn_owners.push_back(lockRequest.txn_);
+    mode = lockRequest.mode_;
 
-//     if (mode == EXCLUSIVE)
-//       break;
-//   }
+    if (mode == EXCLUSIVE)
+      break;
+  }
 
-//   if (owners)
-//     *owners = txn_owners;
+  if (owners)
+    *owners = txn_owners;
 
-//   return mode;
-// }
+  return mode;
+}
 
-// inline bool LockManagerB::_noExclusiveWaiting(const Key& key) {
-//   return _numExclusiveWaiting[key] == 0;
-// }
+inline bool LockManagerB::_noExclusiveWaiting(const Key& key) {
+  return _numExclusiveWaiting[key] == 0;
+}
