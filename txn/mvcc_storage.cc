@@ -96,9 +96,16 @@ bool MVCCStorage::CheckWrite(Key key, int txn_unique_id) {
     int MaxVersion = -1;
     int MaxRTS = -1;
     for(deque<Version*>::iterator it = v_list->begin(); it != v_list->end(); it++){
-      if(((*it)->version_id_ > MaxVersion) && ((*it)->version_id_ <= txn_unique_id)){
-        MaxVersion = (*it)->version_id_;
-        MaxRTS = (*it)->max_read_id_;
+      // If no current version
+      if((*it) == NULL){
+        if(MaxVersion > txn_unique_id || MaxRTS > txn_unique_id){
+          return false;
+        }
+      }else{
+        if(((*it)->version_id_ > MaxVersion) && ((*it)->version_id_ <= txn_unique_id)){
+          MaxVersion = (*it)->version_id_;
+          MaxRTS = (*it)->max_read_id_;
+        }
       }
     }
     // Result valid iff Ti > max (RTS and WTS)

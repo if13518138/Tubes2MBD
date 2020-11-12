@@ -8,7 +8,7 @@
 #include "txn/txn_types.h"
 #include "utils/testing.h"
 
-#define TEST_MODE OCC
+#define TEST_MODE MVCC
 
 // Returns a human-readable string naming of the providing mode.
 string ModeToString(CCMode mode) {
