@@ -8,16 +8,13 @@
 #include "txn/txn_types.h"
 #include "utils/testing.h"
 
-#define TEST_MODE OCC
+#define TEST_MODE LOCKING_EXCLUSIVE_ONLY
 
 // Returns a human-readable string naming of the providing mode.
 string ModeToString(CCMode mode) {
   switch (mode) {
-    case SERIAL:                 return " Serial                             ";
     case LOCKING_EXCLUSIVE_ONLY: return " Simple Locking                     ";
-    case LOCKING:                return " Locking B (Tidak diimplementasikan)";
     case OCC:                    return " OCC                                ";
-    case P_OCC:                  return " OCC-P (Tidak diimplementasikan)    ";
     case MVCC:                   return " MVCC                               ";
     default:                     return "INVALID MODE                        ";
   }
@@ -86,8 +83,8 @@ void Benchmark(const vector<LoadGen*>& lg) {
 
     // For each experiment, run 3 times and get the average.
     for (uint32 exp = 0; exp < lg.size(); exp++) {
-      double throughput[3];
-      for (uint32 round = 0; round < 3; round++) {
+      double throughput[2];
+      for (uint32 round = 0; round < 2; round++) {
 
         int txn_count = 0;
 
@@ -126,7 +123,7 @@ void Benchmark(const vector<LoadGen*>& lg) {
       }
       
       // Print throughput
-      cout << "\t" << (throughput[0] + throughput[1] + throughput[2]) / 3 << "\t" << flush;
+      cout << "\t" << (throughput[0] + throughput[1]) / 2 << "\t" << flush;
   }
 }
 
