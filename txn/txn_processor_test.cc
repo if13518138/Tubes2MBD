@@ -8,7 +8,7 @@
 #include "txn/txn_types.h"
 #include "utils/testing.h"
 
-#define TEST_MODE LOCKING_EXCLUSIVE_ONLY
+#define TEST_MODE OCC
 
 // Returns a human-readable string naming of the providing mode.
 string ModeToString(CCMode mode) {

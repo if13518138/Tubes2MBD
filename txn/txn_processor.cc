@@ -10,6 +10,8 @@
 
 #include "txn/lock_manager.h"
 
+using namespace std;
+
 // Thread & queue counts for StaticThreadPool initialization.
 #define THREAD_COUNT 8
 
@@ -268,7 +270,7 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
   for (auto&& key : txn.readset_) {
     cout << "Currently checking " << txn.unique_id_ << endl;
     cout << "Start time : " << txn.occ_start_time_ << endl;
-    cout << "Data last write : " << storage->Timestamp(key) << endl;
+    cout << "Data last write : " << storage_->Timestamp(key) << endl;
     if (txn.occ_start_time_ < storage_->Timestamp(key)){
       cout << "Invalid, data overwritten when transaction is running" << endl;
       return false;
@@ -278,7 +280,7 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
   for (auto&& key : txn.writeset_) {
     cout << "Currently checking " << txn.unique_id_ << endl;
     cout << "Start time : " << txn.occ_start_time_ << endl;
-    cout << "Data last write : " << storage->Timestamp(key) << endl;
+    cout << "Data last write : " << storage_->Timestamp(key) << endl;
     if (txn.occ_start_time_ < storage_->Timestamp(key)){
       cout << "Invalid, data overwritten when transaction is running" << endl;
       return false;
