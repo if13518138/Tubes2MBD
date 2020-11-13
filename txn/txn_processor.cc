@@ -119,9 +119,11 @@ void TxnProcessor::RunLockingScheduler() {
   Txn* txn;
   while (tp_.Active()) {
     // Start processing the next incoming transaction request.
+    cout << "Currently checking " << txn.unique_id_ << endl;
     if (txn_requests_.Pop(&txn)) {
       bool blocked = false;
       // Request read locks.
+      cout << "Transaction " << txn.unique_id_ << " Requesting Read Lock" << endl;
       for (set<Key>::iterator it = txn->readset_.begin();
            it != txn->readset_.end(); ++it) {
         if (!lm_->ReadLock(txn, *it)) {
@@ -129,6 +131,7 @@ void TxnProcessor::RunLockingScheduler() {
           // If readset_.size() + writeset_.size() > 1, and blocked, just abort
           if (txn->readset_.size() + txn->writeset_.size() > 1) {
             // Release all locks that already acquired
+            cout << "Aborting Action" << endl;
             for (set<Key>::iterator it_reads = txn->readset_.begin(); true; ++it_reads) {
               lm_->Release(txn, *it_reads);
               if (it_reads == it) {
@@ -137,11 +140,14 @@ void TxnProcessor::RunLockingScheduler() {
             }
             break;
           }
+        } else {
+          cout << "Transaction " << txn.unique_id_ << " Immediately Acquire Read Lock" << endl;
         }
       }
 
       if (blocked == false) {
         // Request write locks.
+        cout << "Transaction" << txn.unique_id_ << "Requesting Read Lock" << endl;
         for (set<Key>::iterator it = txn->writeset_.begin();
              it != txn->writeset_.end(); ++it) {
           if (!lm_->WriteLock(txn, *it)) {
@@ -149,6 +155,7 @@ void TxnProcessor::RunLockingScheduler() {
             // If readset_.size() + writeset_.size() > 1, and blocked, just abort
             if (txn->readset_.size() + txn->writeset_.size() > 1) {
               // Release all read locks that already acquired
+              cout << "Aborting Action" << endl;
               for (set<Key>::iterator it_reads = txn->readset_.begin(); it_reads != txn->readset_.end(); ++it_reads) {
                 lm_->Release(txn, *it_reads);
               }
@@ -161,6 +168,8 @@ void TxnProcessor::RunLockingScheduler() {
               }
               break;
             }
+          } else {
+            cout << "Transaction " << txn.unique_id_ << " Immediately Acquire Write Lock" << endl;
           }
         }
       }
@@ -168,8 +177,10 @@ void TxnProcessor::RunLockingScheduler() {
       // If all read and write locks were immediately acquired, this txn is
       // ready to be executed. Else, just restart the txn
       if (blocked == false) {
+        cout << "Read or Write Lock immediately acquired, Transaction " << txn.unique_id_ << " Ready to Be Executed" << endl;
         ready_txns_.push_back(txn);
       } else if (blocked == true && (txn->writeset_.size() + txn->readset_.size() > 1)){
+        cout << "Read or Write Lock Can't immediately acquired, Rebooting Transaction" << txn.unique_id_ << endl;
         mutex_.Lock();
         txn->unique_id_ = next_unique_id_;
         next_unique_id_++;
@@ -182,9 +193,11 @@ void TxnProcessor::RunLockingScheduler() {
     while (completed_txns_.Pop(&txn)) {
       // Commit/abort txn according to program logic's commit/abort decision.
       if (txn->Status() == COMPLETED_C) {
+        cout << "Transaction" << txn.unique_id_ << " Commited" << endl;
         ApplyWrites(txn);
         txn->status_ = COMMITTED;
       } else if (txn->Status() == COMPLETED_A) {
+        cout << "Transaction" << txn.unique_id_ << " Aborted" << endl;
         txn->status_ = ABORTED;
       } else {
         // Invalid TxnStatus!
@@ -194,14 +207,16 @@ void TxnProcessor::RunLockingScheduler() {
       // Release read locks.
       for (set<Key>::iterator it = txn->readset_.begin();
            it != txn->readset_.end(); ++it) {
+        cout << "Release Read Lock Of Transaction" << txn.unique_id_ << endl;
         lm_->Release(txn, *it);
       }
       // Release write locks.
       for (set<Key>::iterator it = txn->writeset_.begin();
            it != txn->writeset_.end(); ++it) {
+        cout << "Release write Lock Of Transaction" << txn.unique_id_ << endl;
         lm_->Release(txn, *it);
       }
-
+      cout << endl;
       // Return result to client.
       txn_results_.Push(txn);
     }
