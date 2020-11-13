@@ -121,6 +121,7 @@ void TxnProcessor::RunLockingScheduler() {
     // Start processing the next incoming transaction request.
     if (txn_requests_.Pop(&txn)) {
       if(DEBUG) {
+        cout << endl;
         cout << "Currently checking " << txn->unique_id_ << endl;
       }
       bool blocked = false;
@@ -233,7 +234,6 @@ void TxnProcessor::RunLockingScheduler() {
             txn));
 
     }
-    if(DEBUG) {cout << endl;}
   }
 }
 
