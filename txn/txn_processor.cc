@@ -10,6 +10,8 @@
 
 #include "txn/lock_manager.h"
 
+using namespace std;
+
 // Thread & queue counts for StaticThreadPool initialization.
 #define THREAD_COUNT 8
 
@@ -118,8 +120,15 @@ void TxnProcessor::RunLockingScheduler() {
   while (tp_.Active()) {
     // Start processing the next incoming transaction request.
     if (txn_requests_.Pop(&txn)) {
+      if(DEBUG) {
+        cout << endl;
+        cout << "Currently checking " << txn->unique_id_ << endl;
+      }
       bool blocked = false;
       // Request read locks.
+      if(DEBUG) {
+        cout << "Transaction " << txn->unique_id_ << " Requesting Read Lock" << endl;
+      }
       for (set<Key>::iterator it = txn->readset_.begin();
            it != txn->readset_.end(); ++it) {
         if (!lm_->ReadLock(txn, *it)) {
@@ -127,6 +136,7 @@ void TxnProcessor::RunLockingScheduler() {
           // If readset_.size() + writeset_.size() > 1, and blocked, just abort
           if (txn->readset_.size() + txn->writeset_.size() > 1) {
             // Release all locks that already acquired
+            if(DEBUG) {cout << "Aborting Action" << endl;}
             for (set<Key>::iterator it_reads = txn->readset_.begin(); true; ++it_reads) {
               lm_->Release(txn, *it_reads);
               if (it_reads == it) {
@@ -140,6 +150,7 @@ void TxnProcessor::RunLockingScheduler() {
 
       if (blocked == false) {
         // Request write locks.
+        if(DEBUG) {cout << "Transaction" << txn->unique_id_ << "Requesting Read Lock" << endl;}
         for (set<Key>::iterator it = txn->writeset_.begin();
              it != txn->writeset_.end(); ++it) {
           if (!lm_->WriteLock(txn, *it)) {
@@ -147,6 +158,7 @@ void TxnProcessor::RunLockingScheduler() {
             // If readset_.size() + writeset_.size() > 1, and blocked, just abort
             if (txn->readset_.size() + txn->writeset_.size() > 1) {
               // Release all read locks that already acquired
+              if (DEBUG) {cout << "Aborting Action" << endl;}
               for (set<Key>::iterator it_reads = txn->readset_.begin(); it_reads != txn->readset_.end(); ++it_reads) {
                 lm_->Release(txn, *it_reads);
               }
@@ -166,8 +178,10 @@ void TxnProcessor::RunLockingScheduler() {
       // If all read and write locks were immediately acquired, this txn is
       // ready to be executed. Else, just restart the txn
       if (blocked == false) {
+        if(DEBUG) {cout << "Read or Write Lock immediately acquired, Transaction " << txn->unique_id_ << " Ready to Be Executed" << endl;}
         ready_txns_.push_back(txn);
       } else if (blocked == true && (txn->writeset_.size() + txn->readset_.size() > 1)){
+        if(DEBUG) {cout << "Read or Write Lock Can't immediately acquired, Rebooting Transaction" << txn->unique_id_ << endl;}
         mutex_.Lock();
         txn->unique_id_ = next_unique_id_;
         next_unique_id_++;
@@ -180,9 +194,11 @@ void TxnProcessor::RunLockingScheduler() {
     while (completed_txns_.Pop(&txn)) {
       // Commit/abort txn according to program logic's commit/abort decision.
       if (txn->Status() == COMPLETED_C) {
+        if (DEBUG) {cout << "Transaction" << txn->unique_id_ << " Commited" << endl;}
         ApplyWrites(txn);
         txn->status_ = COMMITTED;
       } else if (txn->Status() == COMPLETED_A) {
+        if(DEBUG) {cout << "Transaction" << txn->unique_id_ << " Aborted" << endl;}
         txn->status_ = ABORTED;
       } else {
         // Invalid TxnStatus!
@@ -190,20 +206,20 @@ void TxnProcessor::RunLockingScheduler() {
       }
 
       // Release read locks.
+      if(DEBUG) {cout << "Release Read Lock Of Transaction" << txn->unique_id_ << endl;}
       for (set<Key>::iterator it = txn->readset_.begin();
            it != txn->readset_.end(); ++it) {
         lm_->Release(txn, *it);
       }
       // Release write locks.
+      if(DEBUG) {cout << "Release write Lock Of Transaction" << txn->unique_id_ << endl;}
       for (set<Key>::iterator it = txn->writeset_.begin();
            it != txn->writeset_.end(); ++it) {
         lm_->Release(txn, *it);
       }
-
       // Return result to client.
       txn_results_.Push(txn);
     }
-
     // Start executing all transactions that have newly acquired all their
     // locks.
     while (ready_txns_.size()) {
@@ -266,19 +282,34 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
   // No transaction should be allowed to write data when this transaction is still running
   // Which is identified by the timestamp of the data being later then the transaction's start timestamp
   for (auto&& key : txn.readset_) {
-    if (txn.occ_start_time_ < storage_->Timestamp(key))
+    if(DEBUG) {
+      cout << "Currently checking " << txn.unique_id_ << endl;
+      cout << "Start time : " << txn.occ_start_time_ << endl;
+      cout << "Data last write : " << storage_->Timestamp(key) << endl;
+    }
+    if (txn.occ_start_time_ < storage_->Timestamp(key)){
+      if(DEBUG) {cout << "Invalid, data overwritten when transaction is running" << endl;}
       return false;
+    }
   }
 
   for (auto&& key : txn.writeset_) {
-    if (txn.occ_start_time_ < storage_->Timestamp(key))
+    if(DEBUG) {
+      cout << "Currently checking " << txn.unique_id_ << endl;
+      cout << "Start time : " << txn.occ_start_time_ << endl;
+      cout << "Data last write : " << storage_->Timestamp(key) << endl;
+    }
+    if (txn.occ_start_time_ < storage_->Timestamp(key)){
+      if(DEBUG) {cout << "Invalid, data overwritten when transaction is running" << endl;}
       return false;
+    }
   }
 
   return true;
 }
 
 void TxnProcessor::RunOCCScheduler() {
+  cout << fixed;
   // Loop for continuous checking of running transaction
   while (tp_.Active()) {
     Txn *currentTransaction;
@@ -294,10 +325,11 @@ void TxnProcessor::RunOCCScheduler() {
       if (finishedTransaction->Status() == COMPLETED_A) { 
         // If the completion status is COMPLETED_A, then deem it aborted
         finishedTransaction->status_ = ABORTED;
+        if(DEBUG) {cout << "Transaction is abort-voted"<< endl;}
       } else {
         // Check if transaction is valid according to its readset and writeset timestamp
         bool isTransactionValid = OCCValidateTransaction(*finishedTransaction);
-        isTransactionValid = true; //Unidentified segfault, avoided by setting this to true
+        //isTransactionValid = true; //Unidentified segfault, avoided by setting this to true
         if (!isTransactionValid) {
           // Invalid transaction will be cleaned up and restarted
           finishedTransaction->reads_.empty();
@@ -309,15 +341,21 @@ void TxnProcessor::RunOCCScheduler() {
           next_unique_id_++;
           txn_requests_.Push(finishedTransaction);
           mutex_.Unlock();
+          if(DEBUG) {
+            cout << "Transaction is invalid" << endl;
+            cout << "Cleaning up and restarting" << endl;
+          }
         } else {
           // Valid Transaction will be committed
           ApplyWrites(finishedTransaction);
           currentTransaction->status_ = COMMITTED;
+          if(DEBUG){cout << "Transaction is valid" << endl;}
         }
       }
 
       // The result will be pushed into a list of transaction results
       txn_results_.Push(finishedTransaction);
+      if(DEBUG) {cout << endl;}
     }
   }
 }
@@ -360,6 +398,9 @@ void TxnProcessor::MVCCExecuteTxn(Txn *txn){
   // Based on pseudo code in README on reference
   Value res;
   bool ver = true;
+  if(DEBUG){
+    cout << "Transaction " << txn->unique_id_ << endl;
+  }
   // Read all necessary data for this transaction from storage (Note that you should lock the key before each read)
   // Readset
   for(set<Key>::iterator it = txn->readset_.begin(); it != txn->readset_.end(); it++){

@@ -4,6 +4,7 @@
 #define _MVCC_STORAGE_H_
 
 #include "txn/storage.h"
+#include "txn/common.h"
 
 // MVCC 'version' structure
 struct Version {

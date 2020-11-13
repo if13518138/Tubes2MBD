@@ -2,6 +2,8 @@
 // Modified by Daniel Abadi
 
 #include "txn/mvcc_storage.h"
+#include <stdio.h>
+using namespace std;
 
 // Init the storage
 void MVCCStorage::InitStorage() {
@@ -31,11 +33,17 @@ MVCCStorage::~MVCCStorage() {
 
 // Lock the key to protect its version_list. Remember to lock the key when you read/update the version_list 
 void MVCCStorage::Lock(Key key) {
+  if(DEBUG){
+    cout << "Lock " << key << endl;
+  }
   mutexs_[key]->Lock();
 }
 
 // Unlock the key.
 void MVCCStorage::Unlock(Key key) {
+  if(DEBUG){
+    cout << "Unlock " << key << endl << endl;
+  }
   mutexs_[key]->Unlock();
 }
 
@@ -63,13 +71,18 @@ bool MVCCStorage::Read(Key key, Value* result, int txn_unique_id) {
         if(txn_unique_id > (*it)->max_read_id_){
           (*it)->max_read_id_ = txn_unique_id;
         }
+        if(DEBUG){
+          cout << "version_id : " << v_wts << endl;
+          cout << "max_read_id : " << MaxVersion << endl;
+          cout << "txn_unique_id : " << txn_unique_id << endl;
+        }
       }
     }
   }else{
     // Key empty
     return false;
   }
-
+  
   return true;
 }
 
@@ -88,7 +101,9 @@ bool MVCCStorage::CheckWrite(Key key, int txn_unique_id) {
   // call Lock(key) before you call this method and call Unlock(key) afterward.
 
   // Write true iff transaction > largest rts and wts
-  
+  if(DEBUG){
+    cout << "Currently checking write " << txn_unique_id << endl;
+  }
   if(mvcc_data_.count(key)){
     // Deque version list
     deque<Version*> *v_list = mvcc_data_[key];
@@ -131,7 +146,11 @@ void MVCCStorage::Write(Key key, Value value, int txn_unique_id) {
   nVersion->value_ = value;
   nVersion->max_read_id_ = txn_unique_id;
   nVersion->version_id_ = txn_unique_id;
-  
+  // if(DEBUG){
+  //   cout << "version_id " << nVersion->version_id_ << endl;
+  //   cout << "max_read_id : " << txn_unique_id << endl;
+  //   cout << "txn_unique_id : " << txn_unique_id << endl;
+  // }
   // Check if storage exist
   if(!mvcc_data_.count(key)){
     mvcc_data_[key] = new deque<Version*>();
