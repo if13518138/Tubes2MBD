@@ -309,6 +309,7 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
 }
 
 void TxnProcessor::RunOCCScheduler() {
+  cout << fixed;
   // Loop for continuous checking of running transaction
   while (tp_.Active()) {
     Txn *currentTransaction;
