@@ -130,16 +130,16 @@ class LockManagerA : public LockManager {
 };
 
 // Version of the LockManager implementing both shared and exclusive locks.
-class LockManagerB : public LockManager {
- public:
-  explicit LockManagerB(deque<Txn*>* ready_txns);
-  inline virtual ~LockManagerB() {}
+// class LockManagerB : public LockManager {
+//  public:
+//   explicit LockManagerB(deque<Txn*>* ready_txns);
+//   inline virtual ~LockManagerB() {}
 
-  virtual bool ReadLock(Txn* txn, const Key& key);
-  virtual bool WriteLock(Txn* txn, const Key& key);
-  virtual void Release(Txn* txn, const Key& key);
-  virtual LockMode Status(const Key& key, vector<Txn*>* owners);
- private:
+//   virtual bool ReadLock(Txn* txn, const Key& key);
+//   virtual bool WriteLock(Txn* txn, const Key& key);
+//   virtual void Release(Txn* txn, const Key& key);
+//   virtual LockMode Status(const Key& key, vector<Txn*>* owners);
+//  private:
   /**
    * Returns `false` if no exclusive lock is in the lock queue for `key`.
    */
