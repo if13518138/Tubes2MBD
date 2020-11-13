@@ -266,13 +266,23 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
   // No transaction should be allowed to write data when this transaction is still running
   // Which is identified by the timestamp of the data being later then the transaction's start timestamp
   for (auto&& key : txn.readset_) {
-    if (txn.occ_start_time_ < storage_->Timestamp(key))
+    cout << "Currently checking " << txn.unique_id_ << endl;
+    cout << "Start time : " << txn.occ_start_time_ << endl;
+    cout << "Data last write : " << storage->Timestamp(key) << endl;
+    if (txn.occ_start_time_ < storage_->Timestamp(key)){
+      cout << "Invalid, data overwritten when transaction is running" << endl;
       return false;
+    }
   }
 
   for (auto&& key : txn.writeset_) {
-    if (txn.occ_start_time_ < storage_->Timestamp(key))
+    cout << "Currently checking " << txn.unique_id_ << endl;
+    cout << "Start time : " << txn.occ_start_time_ << endl;
+    cout << "Data last write : " << storage->Timestamp(key) << endl;
+    if (txn.occ_start_time_ < storage_->Timestamp(key)){
+      cout << "Invalid, data overwritten when transaction is running" << endl;
       return false;
+    }
   }
 
   return true;
@@ -294,10 +304,11 @@ void TxnProcessor::RunOCCScheduler() {
       if (finishedTransaction->Status() == COMPLETED_A) { 
         // If the completion status is COMPLETED_A, then deem it aborted
         finishedTransaction->status_ = ABORTED;
+        cout << "Transaction is abort-voted"<< endl;
       } else {
         // Check if transaction is valid according to its readset and writeset timestamp
         bool isTransactionValid = OCCValidateTransaction(*finishedTransaction);
-        isTransactionValid = true; //Unidentified segfault, avoided by setting this to true
+        //isTransactionValid = true; //Unidentified segfault, avoided by setting this to true
         if (!isTransactionValid) {
           // Invalid transaction will be cleaned up and restarted
           finishedTransaction->reads_.empty();
@@ -309,15 +320,19 @@ void TxnProcessor::RunOCCScheduler() {
           next_unique_id_++;
           txn_requests_.Push(finishedTransaction);
           mutex_.Unlock();
+          cout << "Transaction is invalid" << endl;
+          cout << "Cleaning up and restarting" << endl;
         } else {
           // Valid Transaction will be committed
           ApplyWrites(finishedTransaction);
           currentTransaction->status_ = COMMITTED;
+          cout << "Transaction is valid" << endl;
         }
       }
 
       // The result will be pushed into a list of transaction results
       txn_results_.Push(finishedTransaction);
+      cout << endl;
     }
   }
 }
