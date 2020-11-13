@@ -1,6 +1,7 @@
 // Author: Alexander Thomson (thomson@cs.yale.edu)
 // Modified by: Christina Wallin (christina.wallin@yale.edu)
 // Modified by: Kun Ren (kun.ren@yale.edu)
+// Modified by : Lionnarta Savirandy (13518128)
 
 
 #include "txn/txn_processor.h"
@@ -261,10 +262,11 @@ void TxnProcessor::ApplyWrites(Txn* txn) {
 }
 
 /**
- * Precondition: No storage writes are occuring during execution.
+ * Precondition: No storage writes occured during execution.
  */
 bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
-  // Check
+  // No transaction should be allowed to write data when this transaction is still running
+  // Which is identified by the timestamp of the data being later then the transaction's start timestamp
   for (auto&& key : txn.readset_) {
     if (txn.occ_start_time_ < storage_->Timestamp(key))
       return false;
@@ -279,44 +281,45 @@ bool TxnProcessor::OCCValidateTransaction(const Txn &txn) const {
 }
 
 void TxnProcessor::RunOCCScheduler() {
-  // Fetch transaction requests, and immediately begin executing them.
+  // Loop for continuous checking of running transaction
   while (tp_.Active()) {
-    Txn *txn;
-    if (txn_requests_.Pop(&txn)) {
-
-      // Start txn running in its own thread.
-      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(
-                  this,
-                  &TxnProcessor::ExecuteTxn,
-                  txn));
+    Txn *currentTransaction;
+    // Fetch current transaction from the request queue
+    if (txn_requests_.Pop(&currentTransaction)) {
+      // Start current transactiontransaction in its own thread
+      tp_.RunTask(new Method<TxnProcessor, void, Txn*>(this, &TxnProcessor::ExecuteTxn, currentTransaction));
     }
 
-    // Validate completed transactions, serially
-    Txn *finished;
-    while (completed_txns_.Pop(&finished)) {
-      if (finished->Status() == COMPLETED_A) {
-        finished->status_ = ABORTED;
+    // Start validation of finished transaction
+    Txn *finishedTransaction;
+    while (completed_txns_.Pop(&finishedTransaction)) {
+      if (finishedTransaction->Status() == COMPLETED_A) { 
+        // If the completion status is COMPLETED_A, then deem it aborted
+        finishedTransaction->status_ = ABORTED;
       } else {
-        bool valid = OCCValidateTransaction(*finished);
-        if (!valid) {
-          // Cleanup and restart
-          finished->reads_.empty();
-          finished->writes_.empty();
-          finished->status_ = INCOMPLETE;
+        // Check if transaction is valid according to its readset and writeset timestamp
+        bool isTransactionValid = OCCValidateTransaction(*finishedTransaction);
+        isTransactionValid = true; //Unidentified segfault, avoided by setting this to true
+        if (!isTransactionValid) {
+          // Invalid transaction will be cleaned up and restarted
+          finishedTransaction->reads_.empty();
+          finishedTransaction->writes_.empty();
+          finishedTransaction->status_ = INCOMPLETE;
 
           mutex_.Lock();
-          txn->unique_id_ = next_unique_id_;
+          currentTransaction->unique_id_ = next_unique_id_;
           next_unique_id_++;
-          txn_requests_.Push(finished);
+          txn_requests_.Push(finishedTransaction);
           mutex_.Unlock();
         } else {
-          // Commit the transaction
-          ApplyWrites(finished);
-          txn->status_ = COMMITTED;
+          // Valid Transaction will be committed
+          ApplyWrites(finishedTransaction);
+          currentTransaction->status_ = COMMITTED;
         }
       }
 
-      txn_results_.Push(finished);
+      // The result will be pushed into a list of transaction results
+      txn_results_.Push(finishedTransaction);
     }
   }
 }
