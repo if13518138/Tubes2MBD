@@ -355,7 +355,7 @@ void TxnProcessor::RunOCCScheduler() {
 
       // The result will be pushed into a list of transaction results
       txn_results_.Push(finishedTransaction);
-      cout << endl;
+      if(DEBUG) {cout << endl;}
     }
   }
 }
