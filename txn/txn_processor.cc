@@ -144,8 +144,6 @@ void TxnProcessor::RunLockingScheduler() {
             }
             break;
           }
-        } else {
-          if (DEBUG) {cout << "Transaction " << txn->unique_id_ << " Immediately Acquire Read Lock" << endl;}
         }
       }
 
@@ -172,8 +170,6 @@ void TxnProcessor::RunLockingScheduler() {
               }
               break;
             }
-          } else {
-            if(DEBUG) {cout << "Transaction " << txn->unique_id_ << " Immediately Acquire Write Lock" << endl;}
           }
         }
       }
@@ -220,11 +216,10 @@ void TxnProcessor::RunLockingScheduler() {
            it != txn->writeset_.end(); ++it) {
         lm_->Release(txn, *it);
       }
-      cout << endl;
+      if(DEBUG) {cout << endl;}
       // Return result to client.
       txn_results_.Push(txn);
     }
-
     // Start executing all transactions that have newly acquired all their
     // locks.
     while (ready_txns_.size()) {
@@ -239,6 +234,7 @@ void TxnProcessor::RunLockingScheduler() {
             txn));
 
     }
+    if(DEBUG) {cout << endl;}
   }
 }
 
