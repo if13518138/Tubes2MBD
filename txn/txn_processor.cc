@@ -216,7 +216,6 @@ void TxnProcessor::RunLockingScheduler() {
            it != txn->writeset_.end(); ++it) {
         lm_->Release(txn, *it);
       }
-      if(DEBUG) {cout << endl;}
       // Return result to client.
       txn_results_.Push(txn);
     }
