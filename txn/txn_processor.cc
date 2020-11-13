@@ -397,6 +397,9 @@ void TxnProcessor::MVCCExecuteTxn(Txn *txn){
   // Based on pseudo code in README on reference
   Value res;
   bool ver = true;
+  if(DEBUG){
+    cout << "Transaction " << txn->unique_id_ << endl;
+  }
   // Read all necessary data for this transaction from storage (Note that you should lock the key before each read)
   // Readset
   for(set<Key>::iterator it = txn->readset_.begin(); it != txn->readset_.end(); it++){
