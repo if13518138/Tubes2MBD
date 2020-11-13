@@ -126,6 +126,7 @@ void MVCCStorage::Write(Key key, Value value, int txn_unique_id) {
   // into the version_lists. Note that InitStorage() also calls this method to init storage. 
   // Note that you don't have to call Lock(key) in this method, just
   // call Lock(key) before you call this method and call Unlock(key) afterward.
+  // Write version
   Version *nVersion = new Version();
   nVersion->value_ = value;
   nVersion->max_read_id_ = txn_unique_id;
